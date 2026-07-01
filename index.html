@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Condensation Polymerisation Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Touch & Smartboard Optimizations */
+        :root {
+            --touch-glow: rgba(37, 99, 235, 0.4);
+            --error-glow: rgba(220, 38, 38, 0.4);
+            --success-glow: rgba(22, 163, 74, 0.4);
+        }
+
+        body {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .touch-target {
+            min-height: 48px;
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.15s ease-out;
+        }
+
+        .touch-active, .touch-target:active {
+            transform: scale(0.97);
+            box-shadow: 0 0 15px var(--touch-glow);
+        }
+
+        .selected-monomer {
+            border-color: #3b82f6 !important;
+            background-color: #eff6ff !important;
+            box-shadow: 0 0 0 4px var(--touch-glow);
+        }
+
+        /* Chemistry Styling */
+        .chem-text {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
+
+        /* Custom Slider Styling */
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            background: #2563eb;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            transition: transform 0.1s;
+        }
+        input[type=range]::-webkit-slider-thumb:active {
+            transform: scale(1.2);
+        }
+        
+        input[type=range]::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            background: #2563eb;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+
+        /* Animation Keyframes */
+        @keyframes popIn {
+            0% { opacity: 0; transform: scale(0.95); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+        .animate-pop { animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+
+        /* Custom Scrollbars */
+        .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans h-screen flex flex-col overflow-hidden">
+
+    <!-- Hideable Header -->
+    <header id="main-header" class="bg-blue-800 text-white shadow-md transition-all duration-300 relative z-20 shrink-0">
+        <div class="px-6 py-3 flex justify-between items-center max-w-[1920px] mx-auto">
+            <div>
+                <h1 class="text-xl md:text-2xl font-bold flex items-center gap-2">
+                    <svg class="w-6 h-6 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+                    </svg>
+                    Condensation Polymerisation Interactive Explorer
+                </h1>
+                <p id="header-subtitle" class="text-blue-200 text-xs hidden md:block">Observe covalent bond-breaking, water elimination, and ester/amide bond formation in real-time!</p>
+            </div>
+            <button id="toggle-header-btn" class="touch-target text-white hover:bg-blue-700 rounded-full" aria-label="Toggle Header">
+                <svg id="header-chevron" class="w-6 h-6 transform transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Workspace Split -->
+    <main class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+        
+        <!-- Left Sidebar: Monomer Bank -->
+        <aside class="w-full md:w-64 lg:w-72 bg-white border-r border-slate-200 flex flex-col z-10 shadow-lg h-[40vh] md:h-auto custom-scroll overflow-y-auto shrink-0">
+            <div class="p-4 border-b border-slate-100 bg-slate-50">
+                <h2 class="text-base font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-blue-600"></span>
+                    Monomer Bank
+                </h2>
+                <p class="text-xs text-slate-500 mt-1">Tap one Dicarboxylic Acid and one Diol/Diamine.</p>
+            </div>
+            
+            <div class="p-4 space-y-6 flex-1">
+                <div>
+                    <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">1. Dicarboxylic Acids</h3>
+                    <div class="space-y-3" id="acid-list">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+                
+                <div>
+                    <h3 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">2. Diols & Diamines</h3>
+                    <div class="space-y-3" id="base-list">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Right Content Area: Workspace & Same-Page Result -->
+        <section class="flex-1 flex flex-col bg-slate-100 relative h-[60vh] md:h-auto overflow-y-auto custom-scroll p-4 md:p-6 space-y-6">
+            
+            <!-- Reaction Vessel -->
+            <div id="reaction-card" class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 md:p-6 flex flex-col items-center">
+                <div class="w-full flex justify-between items-center mb-4 border-b border-slate-100 pb-3">
+                    <h3 class="text-base font-bold text-slate-700 flex items-center gap-2">
+                        <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+                        </svg>
+                        Reaction Vessel
+                    </h3>
+                    <span id="vessel-status" class="text-xs font-semibold px-2 py-1 rounded bg-slate-100 text-slate-600">Awaiting Monomer Selection</span>
+                </div>
+
+                <!-- 3 alternating units container -->
+                <div class="w-full overflow-x-auto py-4 custom-scroll" id="chain-scroll-container">
+                    <div id="alternating-chain-container" class="min-w-[1020px] flex justify-center items-center py-2">
+                        <!-- Dynamic SVG rendered here -->
+                        <div class="text-slate-400 font-medium text-sm text-center py-12 flex flex-col items-center gap-2">
+                            <svg class="w-12 h-12 text-slate-300 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+                            </svg>
+                            Choose an Acid and a Diol/Diamine from the Monomer Bank to display the pre-reaction chain.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Action Control (Slider + Play) -->
+                <div class="mt-4 w-full flex flex-col items-center gap-4 hidden" id="animation-controls">
+                    <div class="w-full max-w-2xl flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200 shadow-sm">
+                        <button id="btn-play" class="touch-target bg-blue-600 text-white w-12 h-12 rounded-full hover:bg-blue-700 shadow flex items-center justify-center shrink-0">
+                            <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4l12 6-12 6z"/></svg>
+                        </button>
+                        <input type="range" id="reaction-slider" min="0" max="100" value="0" class="flex-1 h-3 bg-slate-300 rounded-lg appearance-none cursor-pointer">
+                        <span id="slider-label" class="font-mono font-bold text-sm text-slate-500 w-12 text-right">0%</span>
+                    </div>
+                    <p class="text-xs text-slate-500 text-center">Use the slider or play button to slowly visualize the exact bond breaking (red) and forming (green).</p>
+                </div>
+            </div>
+
+            <!-- Polymerisation Products & Application Panel -->
+            <div id="product-panel" class="hidden bg-white rounded-2xl shadow-sm border border-slate-200 p-5 md:p-6 animate-pop">
+                <div class="flex flex-col lg:flex-row justify-between lg:items-center gap-4 mb-6 border-b border-slate-100 pb-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-indigo-900 flex items-center gap-2">
+                            <span class="p-1.5 bg-indigo-100 rounded text-indigo-700">🧪</span>
+                            Reaction Output: <span id="output-polymer-name">Polyester Chain</span>
+                        </h3>
+                        <p class="text-xs text-slate-500 mt-1">Review the real-world application below.</p>
+                        <div id="n-unit-container" class="mt-4 w-full"></div>
+                    </div>
+                    
+                    <div class="mt-2 flex flex-wrap gap-4 justify-center items-center text-sm font-semibold">
+                        <span class="bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-sm">
+                            💧 Water Formed: <span id="water-molecules-count">6</span> H₂O
+                        </span>
+                        <span class="bg-amber-100 text-amber-800 px-3 py-1 rounded-full flex items-center gap-1.5 shadow-sm">
+                            🔗 Linkage: <span id="linkage-type-badge">Ester Linkage (-COO-)</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Real Life Applications and Chemistry Explanation -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 flex gap-4 items-start shadow-sm">
+                        <div id="app-emoji" class="w-14 h-14 bg-white rounded-full flex items-center justify-center text-3xl shadow-sm shrink-0 border border-blue-200">
+                            👕
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-blue-900 text-sm md:text-base">Real-world Application: <span id="app-polymer-name">PET</span></h4>
+                            <p id="app-polymer-desc" class="text-blue-800 text-xs md:text-sm mt-1 leading-relaxed">
+                                Used extensively in manufacturing polyester fibers for clothing and plastic drinking containers.
+                            </p>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-emerald-50 border border-emerald-100 rounded-xl p-4 flex gap-4 items-start shadow-sm">
+                        <div class="w-14 h-14 bg-white rounded-full flex items-center justify-center text-3xl shadow-sm shrink-0 border border-emerald-200">
+                            💡
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-emerald-900 text-sm md:text-base">Reaction Chemistry Concept</h4>
+                            <p class="text-emerald-800 text-xs md:text-sm mt-1 leading-relaxed">
+                                A dicarboxylic acid reacts with a diol/diamine. For every linkage formed, molecules of water (<span class="font-semibold text-blue-700">H₂O</span>) are eliminated (derived directly from the leaving -OH and -H groups shown in the animation).
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-end">
+                    <button id="btn-reset-vessel" class="touch-target bg-slate-200 text-slate-700 font-bold py-3 px-8 rounded-xl text-sm transition-all hover:bg-slate-300 shadow">
+                        Reset Reaction Vessel
+                    </button>
+                </div>
+            </div>
+
+        </section>
+    </main>
+
+    <!-- JavaScript & Interactive Code -->
+    <script>
+        // --- CONSTANTS & CHEMICAL DATABASE ---
+        const fontBlack = "font-family: monospace; font-size: 16px; font-weight: bold; fill: black;";
+        const fontBlue = "font-family: monospace; font-size: 16px; font-weight: bold; fill: #2563eb;";
+        const bondBlack = `stroke: black; stroke-width: 2.5;`;
+        const bondRed = `stroke: #dc2626; stroke-width: 2.5;`;
+        const bondGreen = `stroke: #16a34a; stroke-width: 4;`;
+
+        const MONOMERS = {
+            m1: { 
+                id: 'm1', type: 'acid', name: 'Adipic Acid', 
+                formulaHTML: '<span class="text-blue-600 font-bold">HOOC</span>-<span class="text-black font-bold">(CH₂)₄</span>-<span class="text-blue-600 font-bold">COOH</span>',
+                labelR: '(CH₂)₄',
+                color: 'border-slate-300 bg-white'
+            },
+            m2: { 
+                id: 'm2', type: 'acid', name: 'Terephthalic Acid', 
+                formulaHTML: '<span class="text-blue-600 font-bold">HOOC</span>-<span class="text-black font-bold">C₆H₄</span>-<span class="text-blue-600 font-bold">COOH</span>',
+                labelR: 'C₆H₄',
+                color: 'border-slate-300 bg-white'
+            },
+            m3: { 
+                id: 'm3', type: 'diol', name: 'Ethylene Glycol', 
+                formulaHTML: '<span class="text-blue-600 font-bold">HO</span>-<span class="text-black font-bold">CH₂-CH₂</span>-<span class="text-blue-600 font-bold">OH</span>',
+                labelR: 'CH₂-CH₂',
+                color: 'border-slate-300 bg-white'
+            },
+            m4: { 
+                id: 'm4', type: 'diamine', name: 'Hexamethylene Diamine', 
+                formulaHTML: '<span class="text-blue-600 font-bold">H₂N</span>-<span class="text-black font-bold">(CH₂)₆</span>-<span class="text-blue-600 font-bold">NH₂</span>',
+                labelR: '(CH₂)₆',
+                color: 'border-slate-300 bg-white'
+            }
+        };
+
+        const APPLICATIONS = {
+            'm1_m3': { type: 'Polyester', name: 'Aliphatic Polyester', emoji: '🌱', desc: 'A soft, biodegradable polymer used in specialty bio-plastics and surgical sutures.' },
+            'm2_m3': { type: 'Polyester', name: 'PET (Polyethylene Terephthalate)', emoji: '🥤', desc: 'The quintessential polyester used in synthetic athletic clothing (Dacron) and durable water bottles.' },
+            'm1_m4': { type: 'Polyamide', name: 'Nylon 6,6', emoji: '🧗', desc: 'Highly resilient synthetic fibers used in structural ropes, parachutes, carpets, and injection-molded automotive gears.' },
+            'm2_m4': { type: 'Polyamide', name: 'Semi-aromatic Polyamide', emoji: '🏎️', desc: 'High-performance polyamide resin capable of withstanding massive engine/industrial heat, often replacing metal parts.' }
+        };
+
+        // --- APP STATE ---
+        let state = {
+            selectedAcid: null,
+            selectedBase: null,
+            isReacted: false,
+            animationFrame: null,
+            isPlaying: false
+        };
+
+        // --- INTERACTIVE EVENT BINDER ---
+        function bindInteraction(element, callback, activeStyle = 'touch-active') {
+            let touchHandled = false;
+            
+            element.addEventListener('touchstart', () => {
+                if(activeStyle) element.classList.add(activeStyle);
+            }, {passive: true});
+
+            element.addEventListener('touchend', (e) => {
+                if(activeStyle) element.classList.remove(activeStyle);
+                
+                if (e.changedTouches.length > 0) {
+                    const touch = e.changedTouches[0];
+                    const rect = element.getBoundingClientRect();
+                    if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+                        touch.clientY >= rect.top && touch.clientY <= rect.bottom) {
+                        
+                        touchHandled = true;
+                        e.preventDefault();
+                        callback(e);
+                        setTimeout(() => { touchHandled = false; }, 80);
+                    }
+                }
+            });
+
+            element.addEventListener('click', (e) => {
+                if (touchHandled) return;
+                callback(e);
+            });
+        }
+
+        // --- DOM REFERENCE UTILS ---
+        const els = {
+            acidList: document.getElementById('acid-list'),
+            baseList: document.getElementById('base-list'),
+            btnResetVessel: document.getElementById('btn-reset-vessel'),
+            reactionContainer: document.getElementById('alternating-chain-container'),
+            vesselStatus: document.getElementById('vessel-status'),
+            productPanel: document.getElementById('product-panel'),
+            linkageTypeBadge: document.getElementById('linkage-type-badge'),
+            outputPolymerName: document.getElementById('output-polymer-name'),
+            appEmoji: document.getElementById('app-emoji'),
+            appPolymerName: document.getElementById('app-polymer-name'),
+            appPolymerDesc: document.getElementById('app-polymer-desc'),
+            nUnitContainer: document.getElementById('n-unit-container'),
+            headerToggle: document.getElementById('toggle-header-btn'),
+            animationControls: document.getElementById('animation-controls'),
+            slider: document.getElementById('reaction-slider'),
+            sliderLabel: document.getElementById('slider-label'),
+            btnPlay: document.getElementById('btn-play')
+        };
+
+        // --- INITIALIZATION ---
+        function init() {
+            renderMonomerBank();
+            setupEventListeners();
+        }
+
+        function renderMonomerBank() {
+            els.acidList.innerHTML = '';
+            els.baseList.innerHTML = '';
+
+            Object.values(MONOMERS).forEach(m => {
+                const card = document.createElement('div');
+                card.className = `touch-target border-2 ${m.color} p-3 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all hover:shadow-md relative`;
+                card.dataset.id = m.id;
+                card.tabIndex = 0;
+                card.setAttribute('role', 'button');
+
+                card.innerHTML = `
+                    <div class="text-sm font-bold text-slate-800 mb-1">${m.name}</div>
+                    <div class="flex items-center text-sm font-mono tracking-wide scale-90 md:scale-100">${m.formulaHTML}</div>
+                `;
+
+                bindInteraction(card, () => selectMonomer(m.id));
+
+                if (m.type === 'acid') {
+                    els.acidList.appendChild(card);
+                } else {
+                    els.baseList.appendChild(card);
+                }
+            });
+        }
+
+        function setupEventListeners() {
+            bindInteraction(els.btnResetVessel, resetVessel);
+            bindInteraction(els.headerToggle, () => {
+                const h = document.getElementById('main-header');
+                const chevron = document.getElementById('header-chevron');
+                h.classList.toggle('-translate-y-[80%]');
+                chevron.classList.toggle('rotate-180');
+            });
+
+            els.slider.addEventListener('input', (e) => {
+                cancelPlay();
+                updateAnimation(parseFloat(e.target.value));
+            });
+            bindInteraction(els.btnPlay, togglePlay);
+        }
+
+        function selectMonomer(id) {
+            if (state.isReacted) return;
+
+            const m = MONOMERS[id];
+            if (m.type === 'acid') {
+                state.selectedAcid = id;
+                Array.from(els.acidList.children).forEach(c => {
+                    c.classList.toggle('selected-monomer', c.dataset.id === id);
+                });
+            } else {
+                state.selectedBase = id;
+                Array.from(els.baseList.children).forEach(c => {
+                    c.classList.toggle('selected-monomer', c.dataset.id === id);
+                });
+            }
+
+            if (state.selectedAcid && state.selectedBase) {
+                renderReactionSVG();
+                els.animationControls.classList.remove('hidden');
+                els.slider.value = 0;
+                updateAnimation(0);
+                
+                els.vesselStatus.textContent = "Ready - Use the slider or play button";
+                els.vesselStatus.className = "text-xs font-semibold px-2 py-1 rounded bg-blue-100 text-blue-700";
+            }
+        }
+
+        // --- DYNAMIC SLIDER-DRIVEN SVG GENERATOR ---
+        function renderReactionSVG() {
+            const acid = MONOMERS[state.selectedAcid];
+            const base = MONOMERS[state.selectedBase];
+            if (!acid || !base) return;
+
+            const count = 6;
+            const itemWidth = 170;
+            const gap = 30;
+            const startX = 30;
+            const yMid = 80;
+
+            let svgContent = `
+                <svg id="vessel-chain-svg" viewBox="0 0 1260 260" class="w-full h-auto drop-shadow-sm bg-white border border-slate-100 rounded-xl p-2">
+            `;
+
+            // Pre-calculate target pairing coords for Water formation
+            const gapTargets = [
+                { x: 600, y: 200 }, // Gap 0 (Outer edges forming 6th water)
+                { x: startX + 170 + 15, y: 155 }, // Gap 1
+                { x: startX + 200 + 170 + 15, y: 155 }, // Gap 2
+                { x: startX + 400 + 170 + 15, y: 155 }, // Gap 3
+                { x: startX + 600 + 170 + 15, y: 155 }, // Gap 4
+                { x: startX + 800 + 170 + 15, y: 155 }  // Gap 5
+            ];
+
+            for (let i = 0; i < count; i++) {
+                const currentX = startX + i * (itemWidth + gap);
+                const isAcid = (i % 2 === 0);
+                
+                svgContent += `
+                    <rect x="${currentX}" y="15" width="${itemWidth}" height="95" rx="8" fill="none" stroke="black" stroke-dasharray="4 4" stroke-width="1.5" />
+                    <text x="${currentX + 85}" y="10" font-family="sans-serif" font-size="12px" font-weight="bold" fill="#64748b" text-anchor="middle">${isAcid ? acid.name : base.name}</text>
+                `;
+
+                if (isAcid) {
+                    const tLeft = gapTargets[(i === 0) ? 0 : i]; 
+                    const tRight = gapTargets[i + 1];
+
+                    svgContent += `
+                        <g class="leaving-group" data-dx="${tLeft.x - (currentX + 35)}" data-dy="${tLeft.y - 85}">
+                            <text x="${currentX + 15}" y="85" style="${fontBlue}" text-anchor="middle">H</text>
+                            <line x1="${currentX + 21}" y1="${yMid}" x2="${currentX + 29}" y2="${yMid}" style="${bondBlack}" />
+                            <text x="${currentX + 35}" y="85" style="${fontBlue}" text-anchor="middle">O</text>
+                        </g>
+                        <line x1="${currentX + 42}" y1="${yMid}" x2="${currentX + 48}" y2="${yMid}" style="${bondRed}" class="bond-breaking" />
+                        
+                        ${i === 0 ? `<line x1="${currentX + 47}" y1="${yMid}" x2="${currentX + 25}" y2="${yMid}" style="${bondGreen}" class="bond-forming opacity-0" />` : ''}
+                        
+                        <text x="${currentX + 55}" y="85" style="${fontBlue}" text-anchor="middle">C</text>
+                        <line x1="${currentX + 52}" y1="68" x2="${currentX + 52}" y2="52" style="${bondBlack}" />
+                        <line x1="${currentX + 58}" y1="68" x2="${currentX + 58}" y2="52" style="${bondBlack}" />
+                        <text x="${currentX + 55}" y="45" style="${fontBlue}" text-anchor="middle">O</text>
+                        
+                        <line x1="${currentX + 63}" y1="${yMid}" x2="${currentX + 70}" y2="${yMid}" style="${bondBlack}" />
+                        <text x="${currentX + 85}" y="85" style="${fontBlack}" text-anchor="middle">${acid.labelR}</text>
+                        <line x1="${currentX + 100}" y1="${yMid}" x2="${currentX + 107}" y2="${yMid}" style="${bondBlack}" />
+                        
+                        <text x="${currentX + 115}" y="85" style="${fontBlue}" text-anchor="middle">C</text>
+                        <line x1="${currentX + 112}" y1="68" x2="${currentX + 112}" y2="52" style="${bondBlack}" />
+                        <line x1="${currentX + 118}" y1="68" x2="${currentX + 118}" y2="52" style="${bondBlack}" />
+                        <text x="${currentX + 115}" y="45" style="${fontBlue}" text-anchor="middle">O</text>
+                        
+                        <line x1="${currentX + 122}" y1="${yMid}" x2="${currentX + 128}" y2="${yMid}" style="${bondRed}" class="bond-breaking" />
+                        
+                        <g class="leaving-group" data-dx="${tRight.x - (currentX + 135)}" data-dy="${tRight.y - 85}">
+                            <text x="${currentX + 135}" y="85" style="${fontBlue}" text-anchor="middle">O</text>
+                            <line x1="${currentX + 141}" y1="${yMid}" x2="${currentX + 149}" y2="${yMid}" style="${bondBlack}" />
+                            <text x="${currentX + 155}" y="85" style="${fontBlue}" text-anchor="middle">H</text>
+                        </g>
+                    `;
+                } else {
+                    const tLeft = gapTargets[i];
+                    const tRight = gapTargets[(i === 5) ? 0 : i + 1];
+                    const atom = base.type === 'diol' ? 'O' : 'N';
+                    const isAmide = base.type === 'diamine';
+
+                    svgContent += `
+                        <text x="${currentX + 15}" y="85" style="${fontBlue}" text-anchor="middle" class="leaving-group" data-dx="${(tLeft.x - 20) - (currentX + 15)}" data-dy="${tLeft.y - 85}">H</text>
+                        <line x1="${currentX + 22}" y1="${yMid}" x2="${currentX + 28}" y2="${yMid}" style="${bondRed}" class="bond-breaking" />
+                        
+                        <text x="${currentX + 35}" y="85" style="${fontBlue}" text-anchor="middle">${atom}</text>
+                        ${isAmide ? `<line x1="${currentX + 35}" y1="90" x2="${currentX + 35}" y2="105" style="${bondBlack}"/><text x="${currentX + 35}" y="120" style="${fontBlue}" text-anchor="middle">H</text>` : ''}
+                        
+                        <line x1="${currentX + 45}" y1="${yMid}" x2="${currentX + 55}" y2="${yMid}" style="${bondBlack}" />
+                        <text x="${currentX + 85}" y="85" style="${fontBlack}" text-anchor="middle">${base.labelR}</text>
+                        <line x1="${currentX + 115}" y1="${yMid}" x2="${currentX + 125}" y2="${yMid}" style="${bondBlack}" />
+                        
+                        <text x="${currentX + 135}" y="85" style="${fontBlue}" text-anchor="middle">${atom}</text>
+                        ${isAmide ? `<line x1="${currentX + 135}" y1="90" x2="${currentX + 135}" y2="105" style="${bondBlack}"/><text x="${currentX + 135}" y="120" style="${fontBlue}" text-anchor="middle">H</text>` : ''}
+                        
+                        <line x1="${currentX + 142}" y1="${yMid}" x2="${currentX + 148}" y2="${yMid}" style="${bondRed}" class="bond-breaking" />
+                        <text x="${currentX + 155}" y="85" style="${fontBlue}" text-anchor="middle" class="leaving-group" data-dx="${(tRight.x + 20) - (currentX + 155)}" data-dy="${tRight.y - 85}">H</text>
+                        
+                        ${i === count - 1 ? `<line x1="${currentX + 142}" y1="${yMid}" x2="${currentX + 165}" y2="${yMid}" style="${bondGreen}" class="bond-forming opacity-0" />` : ''}
+                    `;
+                }
+
+                if (i < count - 1) {
+                    const nextX = startX + (i + 1) * (itemWidth + gap);
+                    let g1, g2, bStartX;
+                    const isAmide = (base.type === 'diamine');
+                    const boxHeight = isAmide ? 110 : 75;
+                    const boxY = 20;
+                    
+                    if (isAcid) {
+                        g1 = currentX + 123; 
+                        g2 = nextX + 27; 
+                        bStartX = currentX + 105;
+                    } else {
+                        g1 = currentX + 143; 
+                        g2 = nextX + 47; 
+                        bStartX = currentX + 125;
+                    }
+
+                    svgContent += `
+                        <line x1="${g1}" y1="${yMid}" x2="${g2}" y2="${yMid}" style="${bondGreen}" class="bond-forming opacity-0" />
+                        <rect x="${bStartX}" y="${boxY}" width="140" height="${boxHeight}" rx="4" fill="none" stroke="#eab308" stroke-dasharray="4 2" stroke-width="2" class="linkage-box opacity-0" />
+                        <text x="${bStartX + 70}" y="${boxY - 5}" fill="#b45309" font-family="sans-serif" font-size="10px" font-weight="bold" text-anchor="middle" class="linkage-box opacity-0">${base.type==='diol' ? 'ESTER LINKAGE (-COO-)' : 'AMIDE LINKAGE (-CONH-)'}</text>
+                    `;
+                }
+            }
+
+            gapTargets.forEach((t, index) => {
+                if (index === 0 || index % 2 === 0) { // Gap 0, 2, 4
+                    svgContent += `<line x1="${t.x + 6}" y1="${t.y - 5}" x2="${t.x + 14}" y2="${t.y - 5}" style="${bondGreen}" class="bond-forming opacity-0" />`;
+                } else { // Gap 1, 3, 5
+                    svgContent += `<line x1="${t.x - 14}" y1="${t.y - 5}" x2="${t.x - 6}" y2="${t.y - 5}" style="${bondGreen}" class="bond-forming opacity-0" />`;
+                }
+                svgContent += `<text x="${t.x}" y="${t.y + 15}" font-family="sans-serif" font-size="10px" font-weight="bold" fill="#0284c7" text-anchor="middle" class="bond-forming opacity-0">Water Molecule</text>`;
+            });
+
+            svgContent += `</svg>`;
+            els.reactionContainer.innerHTML = svgContent;
+        }
+
+        // --- ANIMATION CONTROLLER ---
+        function updateAnimation(val) {
+            els.sliderLabel.textContent = Math.round(val) + '%';
+            
+            if (val > 0 && val < 100) {
+                els.vesselStatus.textContent = "Reaction in progress...";
+                els.vesselStatus.className = "text-xs font-semibold px-2 py-1 rounded bg-amber-100 text-amber-700";
+            }
+
+            // 1. Bond Breaking (0% - 30%)
+            const breakProg = Math.max(0, Math.min(1, val / 30));
+            document.querySelectorAll('.bond-breaking').forEach(el => {
+                el.style.opacity = 1 - breakProg;
+            });
+
+            // 2. Migration of leaving groups to form H2O (0% - 70%)
+            const migrateProg = Math.max(0, Math.min(1, val / 70));
+            document.querySelectorAll('.leaving-group').forEach(el => {
+                const dx = parseFloat(el.dataset.dx);
+                const dy = parseFloat(el.dataset.dy);
+                el.style.transform = `translate(${dx * migrateProg}px, ${dy * migrateProg}px)`;
+            });
+
+            // 3. New Bonds and Linkages fade in (70% - 100%)
+            const finishProg = Math.max(0, Math.min(1, (val - 70) / 30));
+            document.querySelectorAll('.bond-forming, .linkage-box').forEach(el => {
+                el.style.opacity = finishProg;
+            });
+
+            // Handle end state logic seamlessly
+            if (val >= 100) {
+                els.vesselStatus.textContent = "Reaction Complete!";
+                els.vesselStatus.className = "text-xs font-semibold px-2 py-1 rounded bg-green-100 text-green-700";
+                
+                if (!state.isReacted) {
+                    state.isReacted = true;
+                    showProductPanel();
+                }
+            } else if (val < 100 && state.isReacted) {
+                state.isReacted = false;
+                els.productPanel.classList.add('hidden');
+            }
+        }
+
+        function togglePlay() {
+            if (state.isPlaying) {
+                cancelPlay();
+            } else {
+                state.isPlaying = true;
+                els.btnPlay.innerHTML = `<svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M6 4h4v12H6zm4 0h4v12h-4z"/></svg>`;
+                
+                if (parseFloat(els.slider.value) >= 100) {
+                    els.slider.value = 0;
+                    updateAnimation(0);
+                }
+                
+                let startTimestamp = null;
+                const duration = 3000;
+                const startValue = parseFloat(els.slider.value);
+                
+                function step(timestamp) {
+                    if (!startTimestamp) startTimestamp = timestamp;
+                    const progress = (timestamp - startTimestamp) / duration;
+                    let newValue = startValue + progress * 100;
+                    
+                    if (newValue >= 100) {
+                        newValue = 100;
+                        els.slider.value = newValue;
+                        updateAnimation(newValue);
+                        cancelPlay();
+                        return;
+                    }
+                    
+                    els.slider.value = newValue;
+                    updateAnimation(newValue);
+                    state.animationFrame = requestAnimationFrame(step);
+                }
+                state.animationFrame = requestAnimationFrame(step);
+            }
+        }
+
+        function cancelPlay() {
+            if (state.animationFrame) cancelAnimationFrame(state.animationFrame);
+            state.isPlaying = false;
+            els.btnPlay.innerHTML = `<svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path d="M4 4l12 6-12 6z"/></svg>`;
+        }
+
+        function renderNUnitStructure(acid, base) {
+            const atom = base.type === 'diol' ? 'O' : 'N';
+            const isAmide = base.type === 'diamine';
+            const boxHeight = isAmide ? 100 : 70;
+            
+            return `
+                <svg viewBox="0 0 340 150" class="w-full max-w-[500px] h-auto bg-white border border-slate-200 rounded-xl p-4 mx-auto shadow-sm">
+                    <!-- Outer bonds -->
+                    <line x1="20" y1="80" x2="42" y2="80" style="${bondGreen}" />
+                    <path d="M 40 30 L 30 30 L 30 130 L 40 130" stroke="#334155" stroke-width="2" fill="none" />
+
+                    <!-- Acid Core -->
+                    <text x="50" y="85" style="${fontBlue}" text-anchor="middle">C</text>
+                    <line x1="47" y1="68" x2="47" y2="52" style="${bondBlack}" />
+                    <line x1="53" y1="68" x2="53" y2="52" style="${bondBlack}" />
+                    <text x="50" y="45" style="${fontBlue}" text-anchor="middle">O</text>
+
+                    <line x1="58" y1="80" x2="70" y2="80" style="${bondBlack}" />
+                    <text x="95" y="85" style="${fontBlack}" text-anchor="middle">${acid.labelR}</text>
+                    <line x1="120" y1="80" x2="132" y2="80" style="${bondBlack}" />
+
+                    <text x="140" y="85" style="${fontBlue}" text-anchor="middle">C</text>
+                    <line x1="137" y1="68" x2="137" y2="52" style="${bondBlack}" />
+                    <line x1="143" y1="68" x2="143" y2="52" style="${bondBlack}" />
+                    <text x="140" y="45" style="${fontBlue}" text-anchor="middle">O</text>
+
+                    <!-- Linkage (Green) -->
+                    <line x1="148" y1="80" x2="172" y2="80" style="${bondGreen}" />
+
+                    <!-- Base Core -->
+                    <text x="180" y="85" style="${fontBlue}" text-anchor="middle">${atom}</text>
+                    ${isAmide ? `<line x1="180" y1="90" x2="180" y2="105" style="${bondBlack}"/><text x="180" y="120" style="${fontBlue}" text-anchor="middle">H</text>` : ''}
+
+                    <line x1="188" y1="80" x2="200" y2="80" style="${bondBlack}" />
+                    <text x="235" y="85" style="${fontBlack}" text-anchor="middle">${base.labelR}</text>
+                    <line x1="270" y1="80" x2="282" y2="80" style="${bondBlack}" />
+
+                    <text x="290" y="85" style="${fontBlue}" text-anchor="middle">${atom}</text>
+                    ${isAmide ? `<line x1="290" y1="90" x2="290" y2="105" style="${bondBlack}"/><text x="290" y="120" style="${fontBlue}" text-anchor="middle">H</text>` : ''}
+
+                    <line x1="298" y1="80" x2="318" y2="80" style="${bondGreen}" />
+
+                    <!-- Box around the internal linkage -->
+                    <rect x="130" y="30" width="60" height="${boxHeight}" rx="4" fill="none" stroke="#eab308" stroke-dasharray="4 2" stroke-width="2" />
+                    <text x="160" y="25" fill="#b45309" font-family="sans-serif" font-size="8px" font-weight="bold" text-anchor="middle">${base.type==='diol' ? 'ESTER LINKAGE (-COO-)' : 'AMIDE LINKAGE (-CONH-)'}</text>
+
+                    <path d="M 308 30 L 318 30 L 318 130 L 308 130" stroke="#334155" stroke-width="2" fill="none" />
+                    <text x="326" y="135" style="${fontBlack}">n</text>
+                </svg>
+            `;
+        }
+
+        function showProductPanel() {
+            const acid = MONOMERS[state.selectedAcid];
+            const base = MONOMERS[state.selectedBase];
+            const app = APPLICATIONS[`${acid.id}_${base.id}`] || {
+                type: base.type === 'diol' ? 'Polyester' : 'Polyamide',
+                name: 'Synthetic Polymer',
+                emoji: '🧪',
+                desc: 'A synthetic macromolecule manufactured via repeating condensation.'
+            };
+
+            els.outputPolymerName.textContent = app.name;
+            els.appEmoji.textContent = app.emoji;
+            els.appPolymerName.textContent = app.name;
+            els.appPolymerDesc.textContent = app.desc;
+            els.linkageTypeBadge.textContent = app.type === 'Polyester' ? 'Ester Linkage (-COO-)' : 'Amide Linkage (-CONH-)';
+            
+            els.nUnitContainer.innerHTML = renderNUnitStructure(acid, base);
+
+            els.productPanel.classList.remove('hidden');
+            els.productPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function resetVessel() {
+            cancelPlay();
+            state.selectedAcid = null;
+            state.selectedBase = null;
+            state.isReacted = false;
+
+            Array.from(els.acidList.children).forEach(c => c.classList.remove('selected-monomer'));
+            Array.from(els.baseList.children).forEach(c => c.classList.remove('selected-monomer'));
+
+            els.reactionContainer.innerHTML = `
+                <div class="text-slate-400 font-medium text-sm text-center py-12 flex flex-col items-center gap-2">
+                    <svg class="w-12 h-12 text-slate-300 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 4a2 2 0 114 0v1.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+                    </svg>
+                    Choose an Acid and a Diol/Diamine from the Monomer Bank to display the pre-reaction chain.
+                </div>
+            `;
+
+            els.animationControls.classList.add('hidden');
+            els.slider.value = 0;
+            els.sliderLabel.textContent = '0%';
+            
+            els.vesselStatus.textContent = "Awaiting Monomer Selection";
+            els.vesselStatus.className = "text-xs font-semibold px-2 py-1 rounded bg-slate-100 text-slate-600";
+            els.productPanel.classList.add('hidden');
+        }
+
+        // Run application on load
+        window.addEventListener('DOMContentLoaded', init);
+
+    </script>
+</body>
+</html>
